@@ -1,0 +1,201 @@
+import math
+import turtle
+
+class Pong:
+    class Score:
+        def __init__(self):
+            self.pen = turtle.Turtle()
+            self.pen.speed(0)
+            self.pen.color("white")
+            self.pen.penup()
+            self.pen.hideturtle()
+            self.pen.goto(0, 200)
+            self.pen.write("Player: 0  AI: 0", align="center", font=("Courier", 24, "normal"))
+            self.score_player = 0
+            self.score_ai = 0
+
+        def update(self, res) -> None:
+            self.pen.clear()
+            if res == "P":
+                self.score_player += 1
+            elif res == "A":
+                self.score_ai += 1
+            self.pen.write("Player: {0}  AI: {1}".format(self.score_player, self.score_ai), align="center",
+                           font=("Courier", 24, "normal"))
+
+        def getScore(self) -> object:
+            return self
+
+    class Paddle:
+        def __init__(self, color, x, y):
+            self.paddle = turtle.Turtle()
+            self.paddle.speed(0)
+            self.paddle.shape("square")
+            self.paddle.penup()
+            self.paddle.shapesize(stretch_wid=5, stretch_len=1)
+            self.paddle.color(color)
+            self.paddle.goto(x, y)
+
+        def paddleUp(self) -> None:
+            y = self.paddle.ycor()
+            y += 20
+            self.paddle.sety(y)
+
+        def paddleDown(self) -> None:
+            y = self.paddle.ycor()
+            y -= 20
+            self.paddle.sety(y)
+
+        def getCord(self) -> dict:
+            return {"y": self.paddle.ycor(), "x": self.paddle.xcor()}
+
+        def getPaddle(self) -> object:
+            return self
+
+    class Ball:
+        def __init__(self, color):
+            self.ball = turtle.Turtle()
+            self.ball.speed(0)
+            self.ball.shape("square")
+            self.ball.penup()
+            self.ball.color(color)
+            self.ball.goto(0, 0)
+
+            self.ball.dx = -0.15
+            self.ball.dy = 0.15
+
+        def move(self) -> None:
+            self.ball.setx(self.ball.xcor() + self.ball.dx)
+            self.ball.sety(self.ball.ycor() + self.ball.dy)
+
+        def BallBorderCheck(self) -> str:
+            if self.ball.ycor() > 250:
+                self.ball.sety(250)
+                self.ball.dy *= -1
+                print("real", self.ball.ycor(), self.ball.xcor())
+
+            if self.ball.ycor() < -250:
+                self.ball.sety(-250)
+                self.ball.dy *= -1
+                print("real", self.ball.ycor(), self.ball.xcor())
+
+            if self.ball.xcor() > 390:
+                self.ball.goto(0, 0)
+                self.ball.dx *= -1
+                return "P"
+
+            if self.ball.xcor() < -390:
+                self.ball.goto(0, 0)
+                self.ball.dx *= -1
+                return "A"
+
+            return "None"
+
+        def BallCheckForHit(self, padA, padB) -> bool:
+            if (padB["x"] < self.ball.xcor() < padB["x"] + 10) and (padB["y"] + 50 > self.ball.ycor() > padB["y"] - 50):
+                self.ball.setx(340)
+                self.ball.dx *= -1
+                print("hit ai", self.ball.ycor(), self.ball.xcor())
+
+            if (padA["x"] > self.ball.xcor() > padA["x"] - 10) and (padA["y"] + 50 > self.ball.ycor() > padA["y"] - 50):
+                self.ball.setx(-350)
+                self.ball.dx *= -1
+                print("hit player", self.ball.ycor(), self.ball.xcor())
+                return True
+            return False
+
+        def getCords(self):
+            return {"y": self.ball.ycor(), "x": self.ball.xcor(), "dy": self.ball.dy, "dx": self.ball.dx}
+
+        def getBall(self) -> object:
+            return self
+
+    class Screen:
+        def __init__(self, width, height, player, AI):
+            self.wn = turtle.Screen()
+            self.wn.title("Pong by @TamirSpilberg")
+            self.wn.bgcolor("black")
+            self.wn.setup(width=width, height=height)
+            self.wn.tracer(0)
+            self.wn.listen()
+            self.player = player
+            self.AI = AI
+
+            # Keyword Bindings
+            self.wn.onkeypress(self.player.paddleUp, "w")
+            self.wn.onkeypress(self.player.paddleDown, "s")
+            self.wn.onkeypress(self.AI.paddleUp, "Up")
+            self.wn.onkeypress(self.AI.paddleDown, "Down")
+
+        def updateScreen(self) -> None:
+            self.wn.update()
+
+        def getScreen(self) -> object:
+            return self
+
+    def __init__(self):
+        self.pen = Pong.Score().getScore() # ScoreBoard
+        self.player = Pong.Paddle("white", -350, 0).getPaddle() # Player Paddle
+        self.ai = Pong.Paddle("red", 340, 0).getPaddle() # AI Paddle
+        self.ball = Pong.Ball("white").getBall()
+        self.screen = Pong.Screen(800, 500, self.player, self.ai).getScreen()
+        self.aiMover = [False, None]
+
+    def updateScreen(self):
+        self.screen.updateScreen()
+
+    def moveBall(self):
+        self.ball.move()
+
+    def borderCheck(self):
+        res = self.ball.BallBorderCheck()
+        if res == "P" or res == "A":
+            self.pen.update(res)
+
+    def checkForHit(self):
+        if self.ball.BallCheckForHit(self.player.getCord(), self.ai.getCord()): # return True if hit player
+            newPos = self.calcFuturePos(self.ball.getCords())
+            self.aiMover = [True, newPos]
+
+    def calcFuturePos(self, hitPoint):
+        # distance to hit floor considering ball y vector direction
+        disToFloor = 250 + hitPoint["y"] if hitPoint["dy"] > 0 else 250 + hitPoint["y"]
+        disToOtherSide = 340 - hitPoint["x"]
+        dy_on_hit, dx_on_hit, y_on_hit, x_on_hit, deg = 0, 0, 0, 0, math.atan(hitPoint["dy"]/hitPoint["dx"])
+
+        if disToOtherSide <= disToFloor: # reach other side before hitting the floor
+            y_on_hit = hitPoint["y"] + disToOtherSide * math.tan(deg)
+            print("calc", int(y_on_hit), int(x_on_hit))
+            return y_on_hit
+
+        else:
+            dis = abs(disToFloor / math.tan(deg))
+            x_on_hit = dis - abs(hitPoint["x"]) if (abs(hitPoint["x"]) - dis > 0 and hitPoint["x"] < 0) else dis - abs(hitPoint["x"]) if \
+                (abs(hitPoint["x"]) - dis < 0 and hitPoint["x"] < 0) else hitPoint["x"] + dis
+            y_on_hit = 250 if hitPoint["dy"] > 0 else -250
+            dy_on_hit = -1 * hitPoint["dy"]
+            dx_on_hit = hitPoint["dx"]
+
+        print("calc", int(y_on_hit), int(x_on_hit))
+        return self.calcFuturePos({"y": y_on_hit, "x": x_on_hit, "dy": dy_on_hit, "dx": dx_on_hit}) # continue till hit
+
+    # Main game loop
+    def runGame(self):
+        while True:
+            game.updateScreen()
+            game.moveBall()
+            game.borderCheck()
+            game.checkForHit()
+            if self.aiMover[0]:
+                if self.ai.getCord()["y"] < self.aiMover[1]:
+                    self.ai.paddleUp()
+                    if self.ai.getCord()["y"] >= self.aiMover[1]:
+                        self.aiMover[0] = False
+                else:
+                    self.ai.paddleDown()
+                    if self.ai.getCord()["y"] <= self.aiMover[1]:
+                        self.aiMover[0] = False
+
+
+game = Pong()
+game.runGame()
